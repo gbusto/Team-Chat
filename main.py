@@ -186,6 +186,7 @@ def manage_conversation(start_message):
         else:
             current_speaker = next_speaker_name
 
-# Example usage
-user_input = input("user > ")
-manage_conversation(user_input.strip())
+if __name__ == "__main__":
+    # Example usage
+    user_input = input("user > ")
+    manage_conversation(user_input.strip())
