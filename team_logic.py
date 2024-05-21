@@ -6,7 +6,7 @@ from instructions import *
 genai.configure(api_key=os.environ['GOOGLE_DEV_API_KEY'])
 
 MODEL = "gemini-1.5-flash-latest"
-# Delay in seconds
+# Delay in seconds; we need to delay it because Google hasn't given us billing access yet for the API so we're stuck on the FREE plan with the free plan restrictions
 DELAY = 5
 
 class SharedChatHistory:
@@ -30,17 +30,20 @@ class AI_Teammate:
     def __init__(self, name, model_name, system_instructions, shared_history):
         self.name = name
         self.model = genai.GenerativeModel(model_name, system_instruction=system_instructions)
-        self.chat = self.model.start_chat()
         self.shared_history = shared_history
 
-    def send_message(self, message):
+    def send_message(self, message, history=[]):
         time.sleep(DELAY)
 
+        self.chat = self.model.start_chat(history=history)
         self.shared_history.add_message("user", self.name, message)
         response = self.chat.send_message(message)
         reply = response.text
         self.shared_history.add_message("model", self.name, reply)
         return reply
+    
+    def get_history(self):
+        return self.chat.history
 
 
 class AIModerator:
@@ -55,11 +58,14 @@ class AIModerator:
         prompt = f"Based on the following conversation, who should speak next?\n\n{history_text}\n\nRespond with ONLY the next speaker's name, e.g., \"Aristotle\""
         response = self.chat.send_message(prompt)
         next_speaker = response.text.strip()
-        print(f"DEBUG: Moderator response: {next_speaker}")  # Add debug information
+        # print(f"DEBUG: Moderator response: {next_speaker}")  # Add debug information
         return next_speaker
     
-def dbg(prepend="[-]", message=""):
-    print("{} {}".format(prepend, message))
+def dbg(prepend="[-]", message="", debug=False):
+    if debug:
+        print("{} {}".format(prepend, message))
+    else:
+        pass
     
 def manage_conversation(comms, debug=False):
     # User starts the conversation
@@ -80,29 +86,40 @@ def manage_conversation(comms, debug=False):
         'Morgan': AI_Teammate(name='Morgan', model_name=MODEL, system_instructions=morgan_system_instructions, shared_history=shared_history),
     }
 
+    history = []
     response = comms.recv()
     shared_history.add_message("user", current_speaker, response)
 
     while True:
         next_speaker_name = moderator.determine_next_speaker(shared_history.get_history())
-        dbg("[+++]", "Passing conversation over to {}".format(next_speaker_name))
+        dbg("[+++]", "Passing conversation over to {}".format(next_speaker_name), debug=debug)
 
         if next_speaker_name != "Gabe":
             next_speaker = teammates[next_speaker_name]
 
-            response = next_speaker.send_message(response)
+            response = next_speaker.send_message(
+                message=response,
+                history=history
+            )
+            history = next_speaker.get_history()
+
             response_obj = {
                 "role": "assistant",
                 "name": next_speaker_name,
                 "message": response
             }
             comms.send(response_obj)
-
-        user_input = comms.recv()
-        if user_input.strip():
-            # If the user sent any kind of message, add it to the chat
-            response = user_input
-            shared_history.add_message("user", USERNAME, response)
         else:
-            # If the user just pressed enter or sent a blank message, they didn't want to interrupt
-            current_speaker = next_speaker_name
+            user_input = comms.recv()
+            if user_input.strip():
+                if user_input == "get_history":
+                    last_speaker = next_speaker
+                    history = last_speaker.chat.history
+                    print(history)
+                else:
+                    # If the user sent any kind of message, add it to the chat
+                    response = "[{}]: {}".format(USERNAME, user_input)
+                    shared_history.add_message("user", USERNAME, response)
+            else:
+                # If the user just pressed enter or sent a blank message, they didn't want to interrupt
+                current_speaker = next_speaker_name
