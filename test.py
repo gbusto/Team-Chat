@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import Mock
-from main import SharedChatHistory, AI_Teammate, AIModerator
+from team_logic import SharedChatHistory, AI_Teammate, AIModerator
 
 class TestSharedChatHistory(unittest.TestCase):
     def setUp(self):
