@@ -1,5 +1,5 @@
 import sys
-from team_logic import manage_conversation
+from team_logic import manage_conversation, Conversation
 
 class CLIComms(object):
     def __init__(self):
@@ -35,4 +35,9 @@ class CLIComms(object):
         return response
 
 if __name__ == "__main__":
-    manage_conversation(CLIComms(), debug=False)
+    comms = CLIComms()
+    conversation = Conversation(username="Gabe", comms=comms)
+    response = input("user > ")
+    conversation.start_conversation(response)
+    
+    # manage_conversation(CLIComms(), debug=True)

@@ -66,7 +66,79 @@ def dbg(prepend="[-]", message="", debug=False):
         print("{} {}".format(prepend, message))
     else:
         pass
-    
+
+class Conversation(object):
+    def __init__(self, username, comms):
+        self.username = username
+        self.comms = comms
+
+        # The history object that Google updates and manages for us
+        self.history = []
+        # Our own shared history... I'm keeping it around because we may need it later
+        self.shared_history = SharedChatHistory()
+
+        self.teammates = {
+            'Alex': AI_Teammate(
+                name='Alex',
+                model_name=MODEL,
+                system_instructions=alex_system_instructions,
+                shared_history=self.shared_history),
+            'Jordan': AI_Teammate(
+                name='Jordan',
+                model_name=MODEL,
+                system_instructions=jordan_system_instructions,
+                shared_history=self.shared_history),
+            'Casey': AI_Teammate(
+                name='Casey',
+                model_name=MODEL,
+                system_instructions=casey_system_instructions,
+                shared_history=self.shared_history),
+            'Riley': AI_Teammate(
+                name='Riley',
+                model_name=MODEL,
+                system_instructions=riley_system_instructions,
+                shared_history=self.shared_history),
+            'Morgan': AI_Teammate(
+                name='Morgan',
+                model_name=MODEL,
+                system_instructions=morgan_system_instructions,
+                shared_history=self.shared_history),
+        }
+
+        self.moderator = AIModerator(MODEL, system_instructions=moderator_system_instructions)
+
+    def start_conversation(self, start_message):
+        response = start_message
+        self.shared_history.add_message("user", self.username, response)
+
+        while True:
+            next_speaker_name = self.moderator.determine_next_speaker(self.shared_history.get_history())
+            dbg("[+++]", "Passing conversation over to {}".format(next_speaker_name), debug=True)
+
+            if next_speaker_name != "Gabe":
+                next_speaker = self.teammates[next_speaker_name]
+
+                response = next_speaker.send_message(
+                    message=response,
+                    history=self.history
+                )
+                self.history = next_speaker.get_history()
+
+                response_obj = {
+                    "role": "assistant",
+                    "name": next_speaker_name,
+                    "message": response
+                }
+                self.comms.send(response_obj)
+            else:
+                user_input = self.comms.recv()
+                if user_input.strip():
+                    # If the user sent any kind of message, add it to the chat
+                    response = "[{}]: {}".format(self.username, user_input)
+                    self.shared_history.add_message("user", self.username, response)
+
+
+# TODO: Remove this code! Keeping it as reference for now
 def manage_conversation(comms, debug=False):
     # User starts the conversation
     USERNAME = "Gabe"
