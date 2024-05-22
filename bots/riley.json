@@ -1,0 +1,9 @@
+{
+    "id": "riley",
+    "name": "Riley",
+    "host": "localhost",
+    "port": 9804,
+    "hub_uri": "ws://localhost:9999",
+    "instruction_file": "instructions/riley_instructions.txt",
+    "moderator_instruction_file": "instructions/moderator_instructions.txt"
+}
