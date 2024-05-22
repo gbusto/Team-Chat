@@ -79,16 +79,33 @@ async def register_teammate(message, websocket):
     TEAMMATES[_id] = tm
     print(f"Registered {_id}: {name} ({being})")
 
+    # Notify everyone that a new teammate has joined
+    event_message = {
+        "type": "msg_recvd",
+        "from": "hub",
+        "message": f"[EVENT] {name} has joined the chat."
+    }
+    await forward_message("hub", json.dumps(event_message))
+
 async def unregister_teammate(_id):
     if _id in TEAMMATES:
+        name = TEAMMATES[_id].name
         del TEAMMATES[_id]
         print(f"Unregistered {_id}")
+
+        # Notify everyone that a teammate has left
+        event_message = {
+            "type": "msg_recvd",
+            "from": "hub",
+            "message": f"[EVENT] {name} has left the chat."
+        }
+        await forward_message("hub", json.dumps(event_message))
 
 async def forward_message(sender_id, message):
     for _id, teammate in TEAMMATES.items():
         if _id != sender_id:
             await teammate.websocket.send(message)
-            print(f"Forwarded message from {_id} to {teammate.name}")
+            print(f"Forwarded message from {sender_id} to {teammate.name}")
 
 async def echo(websocket, path):
     async for message_obj_str in websocket:
@@ -104,9 +121,8 @@ async def echo(websocket, path):
         
         elif msg_type == "msg_recvd":
             sender_id = message.get("from")
-            name = TEAMMATES[sender_id]
             msg = message.get("message")
-            print(f"{name} > {msg}")
+            print(f"{sender_id} > {msg}")
             await forward_message(sender_id, message_obj_str)
         
         elif msg_type == "cmd_recvd":
