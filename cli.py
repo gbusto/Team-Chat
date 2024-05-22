@@ -1,43 +1,63 @@
-import sys
-from team_logic import Conversation
+import os
+import asyncio
+import json
+import websockets
+import argparse
 
-class CLIComms(object):
-    def __init__(self):
-        pass
+class CLIClient:
+    def __init__(self, _id, name, host, port, hub_uri):
+        self._id = _id
+        self.name = name
+        self.host = host
+        self.port = port
+        self.hub_uri = hub_uri
 
-    def send(self, response_obj):
-        # ANSI escape codes for colors
-        COLORS = {
-            "Alex": "\033[94m",  # Blue
-            "Jordan": "\033[92m",  # Green
-            "Casey": "\033[93m",  # Yellow
-            "Riley": "\033[91m",  # Red
-            "Morgan": "\033[95m",  # Magenta
-            "Gabe": "\033[96m"  # Cyan
-        }
-        RESET_COLOR = "\033[0m"
+    async def connect(self):
+        async with websockets.connect(self.hub_uri) as websocket:
+            # Register client with the hub
+            connect_msg = {
+                "type": "cli_connect",
+                "name": self.name,
+                "id": self._id,
+                "being": "human",
+                "host": self.host,
+                "port": self.port
+            }
+            await websocket.send(json.dumps(connect_msg))
 
-        # Send output back to the user
-        name = response_obj.get("name")
-        message = response_obj.get("message")
-        color = COLORS.get(name, "\033[97m")  # Default to white if name not found
+            receive_task = asyncio.create_task(self.receive_messages(websocket))
+            send_task = asyncio.create_task(self.send_messages(websocket))
 
-        # print("=" * 100)
-        print(f"{color}{name} > {message}{RESET_COLOR}")
-        # print("=" * 100)
+            await asyncio.wait([receive_task, send_task], return_when=asyncio.FIRST_COMPLETED)
 
-    def recv(self):
-        # Receive input from the user
-        response = input("user > ")
-        if response in ["q", "quit", "exit"]:
-            print("[+] User requested to end conversation")
-            sys.exit(0)
-        return response
+    async def receive_messages(self, websocket):
+        async for message in websocket:
+            msg = json.loads(message)
+            print(f"{msg.get('from')}: {msg.get('message')}")
+
+    async def send_messages(self, websocket):
+        while True:
+            msg = input(f"{self.name} > ")
+            message_obj = {
+                "type": "msg_recvd",
+                "from": self._id,
+                "message": msg
+            }
+            await websocket.send(json.dumps(message_obj))
+
+def main():
+    parser = argparse.ArgumentParser(description="CLI Client")
+    parser.add_argument("--id", type=str, required=True, help="Unique identifier for the client")
+    parser.add_argument("--name", type=str, required=True, help="Name of the client")
+    parser.add_argument("--host", type=str, required=True, help="Host IP address")
+    parser.add_argument("--port", type=int, required=True, help="Port number")
+    parser.add_argument("--hub_uri", type=str, required=True, help="WebSocket URI of the hub")
+
+    args = parser.parse_args()
+
+    client = CLIClient(_id=args.id, name=args.name, host=args.host, port=args.port, hub_uri=args.hub_uri)
+
+    asyncio.run(client.connect())
 
 if __name__ == "__main__":
-    comms = CLIComms()
-    conversation = Conversation(username="Gabe", comms=comms)
-    response = input("user > ")
-    conversation.start_conversation(response)
-
-    # manage_conversation(CLIComms(), debug=True)
+    main()
