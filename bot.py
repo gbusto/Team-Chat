@@ -5,51 +5,46 @@ import asyncio
 import websockets
 import argparse
 import google.generativeai as genai
-from instructions import *
+from google.generativeai.types import content_types
 
 genai.configure(api_key=os.environ['GOOGLE_DEV_API_KEY'])
 
 MODEL = "gemini-1.5-flash-latest"
 DELAY = 5
 
-class SharedChatHistory:
+class ConversationHistory:
     def __init__(self):
         self.history = []
 
     def add_message(self, role, name, text):
-        self.history.append({"role": role, "name": name, "text": text})
+        self.history.append({
+            "role": role,
+            "name": name,
+            "text": text,
+            "parts": [{"text": f"[{name}] {text}"}]
+        })
 
     def get_history(self):
-        return self.history
-
-    def format_history(self):
-        formatted_history = []
-        for entry in self.history:
-            formatted_history.append(f"{entry['name']} ({entry['role']}): {entry['text']}")
-        return "\n".join(formatted_history)
+        return [{"role": entry["role"], "parts": entry["parts"]} for entry in self.history]
 
 class AI_Teammate:
-    def __init__(self, name, model_name, system_instructions, shared_history):
+    def __init__(self, name, model_name, system_instructions, conversation_history):
         print("[+] Bot got system instruction: {}".format(system_instructions[:20]))
         self.name = name
         self.model = genai.GenerativeModel(model_name, system_instruction=system_instructions)
-        self.shared_history = shared_history
-        self.chat = self.model.start_chat(history=[])
+        self.conversation_history = conversation_history
+        self.chat = self.model.start_chat(history=conversation_history.get_history())
 
-    def send_message(self, message, history=[]):
+    def send_message(self, message):
         time.sleep(DELAY)
         print(f"{self.name} is processing the message: {message}")
 
-        self.chat = self.model.start_chat(history=history)
-        self.shared_history.add_message("user", self.name, message)
+        self.conversation_history.add_message("user", self.name, message)
         response = self.chat.send_message(message)
         reply = response.text
-        self.shared_history.add_message("model", self.name, reply)
+        self.conversation_history.add_message("model", self.name, reply)
         print(f"{self.name} response: {reply}")
         return reply
-    
-    def get_history(self):
-        return self.chat.history
 
 class AIModerator:
     def __init__(self, model_name, system_instructions, teammate_name):
@@ -61,9 +56,9 @@ class AIModerator:
     def should_speak_next(self, chat_history):
         time.sleep(DELAY)
         recent_history = chat_history[-10:]  # Get the last 10 messages
-        history_text = "\n".join([f"{entry['name']} ({entry['role']}): {entry['text']}" for entry in recent_history])
+        history_text = "\n".join([f"{entry['parts'][0]['text']}" for entry in recent_history])
         prompt = f"Based on the following conversation, should {self.teammate_name} speak next?\n\n{history_text}\n\nRespond with YES or NO."
-        
+
         response = self.chat.send_message(prompt)
         answer = response.text.strip().lower()
         print(f"Moderator response: {answer}")
@@ -84,8 +79,8 @@ class Bot:
         self.port = port
         self.hub_uri = hub_uri
 
-        self.shared_history = SharedChatHistory()
-        self.teammate = AI_Teammate(name=name, model_name=MODEL, system_instructions=bot_instructions, shared_history=self.shared_history)
+        self.conversation_history = ConversationHistory()
+        self.teammate = AI_Teammate(name=name, model_name=MODEL, system_instructions=bot_instructions, conversation_history=self.conversation_history)
         self.moderator = AIModerator(model_name=MODEL, system_instructions=mod_instructions, teammate_name=name)
 
     async def connect(self):
@@ -113,14 +108,12 @@ class Bot:
             msg = message.get("message")
 
             # Maintain chat history
-            self.shared_history.add_message("user", sender, msg)
+            self.conversation_history.add_message("user", sender, msg)
 
             if not msg.startswith("[EVENT]"):
                 # Moderator decides if this bot should respond
-                if self.moderator.should_speak_next(self.shared_history.get_history()):
-                    history = self.teammate.get_history()
-                    # We want to send the proper chat history that Google is creating
-                    response = self.teammate.send_message(message=msg, history=history)
+                if self.moderator.should_speak_next(self.conversation_history.get_history()):
+                    response = self.teammate.send_message(message=msg)
                     response_msg = {
                         "type": "msg_recvd",
                         "from": self._id,
