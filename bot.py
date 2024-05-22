@@ -51,25 +51,29 @@ class AI_Teammate:
         return self.chat.history
 
 class AIModerator:
-    def __init__(self, model_name, system_instructions):
+    def __init__(self, model_name, system_instructions, teammate_name):
         print("[+] Mod got system instruction: {}".format(system_instructions[:20]))    
         self.model = genai.GenerativeModel(model_name, system_instruction=system_instructions)
+        self.teammate_name = teammate_name
         self.chat = self.model.start_chat()
 
-    def determine_next_speaker(self, chat_history):
+    def should_speak_next(self, chat_history):
         time.sleep(DELAY)
-        history_text = "\n".join([f"{entry['name']} ({entry['role']}): {entry['text']}" for entry in chat_history])
-        prompt = f"Based on the following conversation, who should speak next?\n\n{history_text}\n\nRespond with ONLY the next speaker's name, e.g., \"Aristotle\""
+        recent_history = chat_history[-10:]  # Get the last 10 messages
+        history_text = "\n".join([f"{entry['name']} ({entry['role']}): {entry['text']}" for entry in recent_history])
+        prompt = f"Based on the following conversation, should {self.teammate_name} speak next?\n\n{history_text}\n\nRespond with YES or NO."
         
         response = self.chat.send_message(prompt)
-        next_speaker = response.text.strip()
-        print(f"Moderator response: {next_speaker}")
-        
-        valid_speakers = ['Alex', 'Jordan', 'Casey', 'Riley', 'Morgan', 'Gabe']
-        if next_speaker not in valid_speakers:
-            print(f"Invalid speaker name returned by moderator: {next_speaker}")
-            return "Gabe"  # Fallback to user if invalid response
-        return next_speaker
+        answer = response.text.strip().lower()
+        print(f"Moderator response: {answer}")
+
+        if answer in ["yes", "y"]:
+            return True
+        elif answer in ["no", "n"]:
+            return False
+        else:
+            print(f"Invalid response from moderator: {answer}")
+            return False  # Default to not speaking if the response is invalid
 
 class Bot:
     def __init__(self, _id, name, host, port, hub_uri, bot_instructions, mod_instructions):
@@ -81,7 +85,7 @@ class Bot:
 
         self.shared_history = SharedChatHistory()
         self.teammate = AI_Teammate(name=name, model_name=MODEL, system_instructions=bot_instructions, shared_history=self.shared_history)
-        self.moderator = AIModerator(model_name=MODEL, system_instructions=mod_instructions)
+        self.moderator = AIModerator(model_name=MODEL, system_instructions=mod_instructions, teammate_name=name)
 
     async def connect(self):
         async with websockets.connect(self.hub_uri) as websocket:
@@ -111,10 +115,8 @@ class Bot:
             self.shared_history.add_message("user", sender, msg)
 
             # Moderator decides if this bot should respond
-            next_speaker_name = self.moderator.determine_next_speaker(self.shared_history.get_history())
-
-            if next_speaker_name == self.name:
-                response = self.teammate.send_message(message=msg, history=self.get_history())
+            if self.moderator.should_speak_next(self.shared_history.get_history()):
+                response = self.teammate.send_message(message=msg, history=self.shared_history.get_history())
                 response_msg = {
                     "type": "msg_recvd",
                     "from": self._id,
