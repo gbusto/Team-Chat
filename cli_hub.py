@@ -1,6 +1,7 @@
 import asyncio
 import json
 from websockets.server import serve
+
 """
 Types:
 CLI connect: {
@@ -45,74 +46,76 @@ CMD recvd: {
 """
 
 class Teammate(object):
-    def __init__(self, _id, name, being, host, port):
+    def __init__(self, _id, name, being, host, port, websocket):
         self._id = _id
         self.name = name
         self.being = being
         self.host = host
         self.port = port
+        self.websocket = websocket
 
     def is_human(self):
         return self.being == "human"
     
     def is_ai(self):
         return self.being == "ai"
-    
+
 TEAMMATES = {}
 
-async def echo(websocket):
+async def register_teammate(message, websocket):
+    name = message.get("name")
+    _id = message.get("id")
+    being = message.get("being")
+    host = message.get("host")
+    port = message.get("port")
+    tm = Teammate(
+        _id=_id,
+        name=name,
+        being=being,
+        host=host,
+        port=port,
+        websocket=websocket
+    )
+    TEAMMATES[_id] = tm
+    print(f"Registered {_id}: {name} ({being})")
+
+async def unregister_teammate(_id):
+    if _id in TEAMMATES:
+        del TEAMMATES[_id]
+        print(f"Unregistered {_id}")
+
+async def forward_message(sender_id, message):
+    for _id, teammate in TEAMMATES.items():
+        if _id != sender_id:
+            await teammate.websocket.send(message)
+            print(f"Forwarded message from {_id} to {teammate.name}")
+
+async def echo(websocket, path):
     async for message_obj_str in websocket:
         message = json.loads(message_obj_str)
         msg_type = message.get("type")
         
-        if msg_type == "cli_connect":
-            # A human teammate has connected
-            name = message.get("name")
+        if msg_type in ["cli_connect", "ai_connect"]:
+            await register_teammate(message, websocket)
+        
+        elif msg_type in ["cli_disconnect", "ai_disconnect"]:
             _id = message.get("id")
-            being = message.get("being")
-            host = message.get("host")
-            port = message.get("port")
-            tm = Teammate(
-                _id=_id,
-                name=name,
-                being=being,
-                host=host,
-                port=port
-            )
-            TEAMMATES[_id] = tm
-
-        elif msg_type == "ai_connect":
-            # An AI teammate has connected
-            name = message.get("name")
-            _id = message.get("id")
-            being = message.get("being")
-            tm = Teammate(
-                _id=_id,
-                name=name,
-                being=being,
-                host=host,
-                port=port
-            )
-            TEAMMATES[_id] = tm
-
+            await unregister_teammate(_id)
+        
         elif msg_type == "msg_recvd":
-            # Received a message from someone
-            sender = message.get("from")
+            sender_id = message.get("from")
+            name = TEAMMATES[sender_id]
             msg = message.get("message")
-
-            for tm in TEAMMATES:
-                if tm != sender:
-                    
+            print(f"{name} > {msg}")
+            await forward_message(sender_id, message_obj_str)
         
         elif msg_type == "cmd_recvd":
-            # Received a command from someone
+            # Handle commands if necessary
             pass
-
+        
         else:
-            print("[?] Unknown websocket message received: {}".format(msg_type))
+            print(f"[?] Unknown websocket message received: {msg_type}")
             print(message_obj_str)
-            
-        await websocket.send(message)
 
 async def main():
     async with serve(echo, "localhost", 9999):
