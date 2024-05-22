@@ -1,6 +1,21 @@
 import asyncio
 import json
+import logging
 from websockets.server import serve
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s %(levelname)s: %(message)s',
+    handlers=[
+        logging.FileHandler("cli_hub.log"),
+        # logging.StreamHandler()
+    ]
+)
+
+# Define ANSI color codes for console output
+YELLOW = "\033[93m"
+RESET = "\033[0m"
 
 """
 Types:
@@ -45,7 +60,7 @@ CMD recvd: {
 }
 """
 
-class Teammate(object):
+class Teammate:
     def __init__(self, _id, name, being, host, port, websocket):
         self._id = _id
         self.name = name
@@ -77,7 +92,7 @@ async def register_teammate(message, websocket):
         websocket=websocket
     )
     TEAMMATES[_id] = tm
-    print(f"Registered {_id}: {name} ({being})")
+    logging.info(f"Registered {_id}: {name} ({being})")
 
     # Notify everyone that a new teammate has joined
     event_message = {
@@ -91,7 +106,7 @@ async def unregister_teammate(_id):
     if _id in TEAMMATES:
         name = TEAMMATES[_id].name
         del TEAMMATES[_id]
-        print(f"Unregistered {_id}")
+        logging.info(f"Unregistered {_id}")
 
         # Notify everyone that a teammate has left
         event_message = {
@@ -105,7 +120,7 @@ async def forward_message(sender_id, message):
     for _id, teammate in TEAMMATES.items():
         if _id != sender_id:
             await teammate.websocket.send(message)
-            print(f"Forwarded message from {sender_id} to {teammate.name}")
+            logging.debug(f"Forwarded message from {sender_id} to {teammate.name}")
 
 async def echo(websocket, path):
     async for message_obj_str in websocket:
@@ -122,7 +137,8 @@ async def echo(websocket, path):
         elif msg_type == "msg_recvd":
             sender_id = message.get("from")
             msg = message.get("message")
-            print(f"{sender_id} > {msg}")
+            sender_name = TEAMMATES[sender_id].name if sender_id in TEAMMATES else "Unknown"
+            print(f"{YELLOW}{sender_name}{RESET} > {msg}")
             await forward_message(sender_id, message_obj_str)
         
         elif msg_type == "cmd_recvd":
@@ -130,8 +146,8 @@ async def echo(websocket, path):
             pass
         
         else:
-            print(f"[?] Unknown websocket message received: {msg_type}")
-            print(message_obj_str)
+            logging.warning(f"Unknown websocket message received: {msg_type}")
+            logging.warning(message_obj_str)
 
 async def main():
     async with serve(echo, "localhost", 9999):

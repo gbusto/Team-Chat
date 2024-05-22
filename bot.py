@@ -34,6 +34,7 @@ class AI_Teammate:
         self.name = name
         self.model = genai.GenerativeModel(model_name, system_instruction=system_instructions)
         self.shared_history = shared_history
+        self.chat = self.model.start_chat(history=[])
 
     def send_message(self, message, history=[]):
         time.sleep(DELAY)
@@ -114,15 +115,20 @@ class Bot:
             # Maintain chat history
             self.shared_history.add_message("user", sender, msg)
 
-            # Moderator decides if this bot should respond
-            if self.moderator.should_speak_next(self.shared_history.get_history()):
-                response = self.teammate.send_message(message=msg, history=self.shared_history.get_history())
-                response_msg = {
-                    "type": "msg_recvd",
-                    "from": self._id,
-                    "message": response
-                }
-                await websocket.send(json.dumps(response_msg))
+            if not msg.startswith("[EVENT]"):
+                # Moderator decides if this bot should respond
+                if self.moderator.should_speak_next(self.shared_history.get_history()):
+                    history = self.teammate.get_history()
+                    # We want to send the proper chat history that Google is creating
+                    response = self.teammate.send_message(message=msg, history=history)
+                    response_msg = {
+                        "type": "msg_recvd",
+                        "from": self._id,
+                        "message": response
+                    }
+                    await websocket.send(json.dumps(response_msg))
+            else:
+                print("Received event: {}".format(msg))
 
 def main():
     parser = argparse.ArgumentParser(description="AI Bot")
