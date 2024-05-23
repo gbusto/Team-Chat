@@ -86,7 +86,8 @@ async def register_teammate(message, websocket):
         "type": "msg_recvd",
         "from": SYSTEM_ID,
         "origin": SYSTEM_ID,
-        "message": f"[EVENT] {name} has joined the chat."
+        "message": f"[EVENT] {name} has joined the chat.",
+        "timestamp": get_timestamp()
     }
     save_message_to_history(SYSTEM_ID, SYSTEM_ID, f"{name} has joined the chat.", SYSTEM_ID, is_system_event=True)
     await forward_message(websocket, json.dumps(event_message))  # Pass websocket to forward_message
@@ -102,7 +103,8 @@ async def unregister_teammate(_id):
             "type": "msg_recvd",
             "from": SYSTEM_ID,
             "origin": SYSTEM_ID,
-            "message": f"[EVENT] {name} has left the chat."
+            "message": f"[EVENT] {name} has left the chat.",
+            "timestamp": get_timestamp()
         }
         save_message_to_history(SYSTEM_ID, SYSTEM_ID, f"{name} has left the chat.", SYSTEM_ID, is_system_event=True)
         await forward_message(None, json.dumps(event_message)) # No specific websocket needed for broadcast
@@ -135,9 +137,13 @@ async def echo(websocket, path):
                 msg = message.get("message")
                 origin = message.get("origin")
                 sender_name = TEAMMATES[sender_id].name if sender_id in TEAMMATES else "Unknown"
+                timestamp = get_timestamp()
                 print(f"{YELLOW}{sender_name}|[{origin}]{RESET} > {msg}")
                 save_message_to_history(sender_id, sender_name, msg, origin)
-                await forward_message(websocket, message_obj_str)  # Pass websocket to forward_message
+                
+                # Add timestamp to the message before forwarding
+                message["timestamp"] = timestamp
+                await forward_message(websocket, json.dumps(message))  # Pass websocket to forward_message
             
             elif msg_type == "ping":
                 await websocket.send(json.dumps({"type": "pong"}))
