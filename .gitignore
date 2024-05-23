@@ -2,3 +2,4 @@ venv/
 cli_hub.log
 *.log
 chat-app/node_modules
+*.chat

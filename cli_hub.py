@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import argparse
+from datetime import datetime
 from websockets.server import serve
 
 # Configure logging
@@ -40,6 +41,28 @@ class Teammate:
         return self.origin == "ai"
 
 TEAMMATES = {}
+chat_history_file = None
+
+def get_timestamp():
+    return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+def get_chat_filename():
+    return datetime.now().strftime('%b-%d-%Y_%I-%M-%p.chat')
+
+def initialize_chat_history():
+    global chat_history_file
+    filename = get_chat_filename()
+    chat_history_file = open(filename, 'a')
+
+def save_message_to_history(sender_id, sender_name, message, origin, is_system_event=False):
+    global chat_history_file
+    timestamp = get_timestamp()
+    if is_system_event:
+        log_entry = f"{timestamp} | SYSTEM [{origin}]: {message}\n"
+    else:
+        log_entry = f"{timestamp} | {sender_name} (ID: {sender_id}) [{origin}]: {message}\n"
+    chat_history_file.write(log_entry)
+    chat_history_file.flush()
 
 async def register_teammate(message, websocket):
     name = message.get("name")
@@ -65,6 +88,7 @@ async def register_teammate(message, websocket):
         "origin": SYSTEM_ID,
         "message": f"[EVENT] {name} has joined the chat."
     }
+    save_message_to_history(SYSTEM_ID, SYSTEM_ID, f"{name} has joined the chat.", SYSTEM_ID, is_system_event=True)
     await forward_message(websocket, json.dumps(event_message))  # Pass websocket to forward_message
 
 async def unregister_teammate(_id):
@@ -80,6 +104,7 @@ async def unregister_teammate(_id):
             "origin": SYSTEM_ID,
             "message": f"[EVENT] {name} has left the chat."
         }
+        save_message_to_history(SYSTEM_ID, SYSTEM_ID, f"{name} has left the chat.", SYSTEM_ID, is_system_event=True)
         await forward_message(None, json.dumps(event_message)) # No specific websocket needed for broadcast
 
 async def forward_message(websocket, message):
@@ -111,6 +136,7 @@ async def echo(websocket, path):
                 origin = message.get("origin")
                 sender_name = TEAMMATES[sender_id].name if sender_id in TEAMMATES else "Unknown"
                 print(f"{YELLOW}{sender_name}|[{origin}]{RESET} > {msg}")
+                save_message_to_history(sender_id, sender_name, msg, origin)
                 await forward_message(websocket, message_obj_str)  # Pass websocket to forward_message
             
             elif msg_type == "ping":
@@ -134,6 +160,7 @@ async def echo(websocket, path):
 
 async def main(console_output):
     configure_logging(console_output)
+    initialize_chat_history()
     async with serve(echo, "localhost", 9999):
         logging.info("Server started")
         await asyncio.Future()  # run forever
