@@ -89,6 +89,7 @@ async def forward_message(websocket, message):
 
 async def echo(websocket, path):
     try:
+        logging.info("New connection")
         async for message_obj_str in websocket:
             message = json.loads(message_obj_str)
             msg_type = message.get("type")
@@ -124,10 +125,12 @@ async def echo(websocket, path):
         for _id, teammate in list(TEAMMATES.items()):
             if teammate.websocket == websocket:
                 await unregister_teammate(_id)
+        logging.info("Connection closed")
 
 async def main(console_output):
     configure_logging(console_output)
     async with serve(echo, "localhost", 9999):
+        logging.info("Server started")
         await asyncio.Future()  # run forever
 
 if __name__ == "__main__":
