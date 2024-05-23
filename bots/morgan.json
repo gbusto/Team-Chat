@@ -1,9 +1,0 @@
-{
-    "id": "morgan",
-    "name": "Morgan",
-    "host": "localhost",
-    "port": 9805,
-    "hub_uri": "ws://localhost:9999",
-    "instruction_file": "instructions/morgan_instructions.txt",
-    "moderator_instruction_file": "instructions/moderator_instructions.txt"
-}
