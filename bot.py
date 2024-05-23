@@ -5,7 +5,7 @@ import websockets
 import argparse
 import logging
 import google.generativeai as genai
-from google.generativeai.types import content_types
+from google.generativeai.types import content_types, generation_types
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', filename='bot.log', filemode='a')
@@ -15,6 +15,8 @@ console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(
 logging.getLogger().addHandler(console_handler)
 
 genai.configure(api_key=os.environ['GOOGLE_DEV_API_KEY'])
+
+MOD_TEMP = 0.1
 
 MODEL = "gemini-1.5-flash-latest"
 DELAY = 5
@@ -41,10 +43,12 @@ class ConversationHistory:
         return self.history[-limit:]
 
 class AI_Teammate:
-    def __init__(self, name, model_name, system_instructions, conversation_history):
+    def __init__(self, name, model_name, system_instructions, conversation_history, temperature):
         logging.info(f"[+] Bot got system instruction: {system_instructions[:20]}")
+        config = generation_types.GenerationConfig(temperature=temperature)
+
         self.name = name
-        self.model = genai.GenerativeModel(model_name, system_instruction=system_instructions)
+        self.model = genai.GenerativeModel(model_name, generation_config=config, system_instruction=system_instructions)
         self.conversation_history = conversation_history
         self.chat = self.model.start_chat(history=conversation_history.get_history())
 
@@ -60,9 +64,10 @@ class AI_Teammate:
         return reply
 
 class AIModerator:
-    def __init__(self, model_name, system_instructions, teammate_name):
+    def __init__(self, model_name, system_instructions, teammate_name, temperature):
         logging.info(f"[+] Mod got system instruction: {system_instructions[:20]}")
-        self.model = genai.GenerativeModel(model_name, system_instruction=system_instructions)
+        config = generation_types.GenerationConfig(temperature=temperature)
+        self.model = genai.GenerativeModel(model_name, generation_config=config, system_instruction=system_instructions)
         self.teammate_name = teammate_name
         self.chat = self.model.start_chat()
 
@@ -85,16 +90,17 @@ class AIModerator:
             return False  # Default to not speaking if the response is invalid
 
 class Bot:
-    def __init__(self, _id, name, host, port, hub_uri, bot_instructions, mod_instructions):
+    def __init__(self, _id, name, host, port, hub_uri, bot_instructions, mod_instructions, temperature):
         self._id = _id
         self.name = name
         self.host = host
         self.port = port
         self.hub_uri = hub_uri
+        self.temperature = temperature
 
         self.conversation_history = ConversationHistory()
-        self.teammate = AI_Teammate(name=name, model_name=MODEL, system_instructions=bot_instructions, conversation_history=self.conversation_history)
-        self.moderator = AIModerator(model_name=MODEL, system_instructions=mod_instructions, teammate_name=name)
+        self.teammate = AI_Teammate(name=name, model_name=MODEL, system_instructions=bot_instructions, conversation_history=self.conversation_history, temperature=self.temperature)
+        self.moderator = AIModerator(model_name=MODEL, system_instructions=mod_instructions, teammate_name=name, temperature=MOD_TEMP)
         self.message_queue = asyncio.Queue()
 
     async def connect(self):
@@ -182,6 +188,7 @@ def main():
     parser.add_argument("--hub_uri", type=str, required=True, help="WebSocket URI of the hub")
     parser.add_argument("--instruction-file", type=str, required=True, help="The txt file containing instructions for this bot")
     parser.add_argument("--moderator-instruction-file", type=str, required=True, help="The moderator instruction file")
+    parser.add_argument("--temperature", type=float, required=False, default=1.0, help="The temperature for the model which controls how creative (closer to 1) or how strict (closer to 0) it is")
 
     args = parser.parse_args()
 
@@ -200,7 +207,7 @@ def main():
     with open(m_inst_file, "r") as f:
         m_inst = f.read()
 
-    bot = Bot(_id=args.id, name=args.name, host=args.host, port=args.port, hub_uri=args.hub_uri, bot_instructions=inst, mod_instructions=m_inst)
+    bot = Bot(_id=args.id, name=args.name, host=args.host, port=args.port, hub_uri=args.hub_uri, bot_instructions=inst, mod_instructions=m_inst, temperature=args.temperature)
 
     try:
         asyncio.run(bot.connect())

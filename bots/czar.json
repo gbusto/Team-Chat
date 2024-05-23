@@ -5,5 +5,5 @@
     "port": 9899,
     "hub_uri": "ws://localhost:9999",
     "instruction_file": "instructions/chat_moderator_instructions.txt",
-    "moderator_instruction_file": "instructions/chat_moderator_instructions.txt"
+    "moderator_instruction_file": "instructions/moderator_instructions.txt"
 }
