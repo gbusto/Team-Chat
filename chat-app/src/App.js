@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { w3cwebsocket as W3CWebSocket } from 'websocket';
+import ReactMarkdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import './App.css';
 
 let client;
@@ -55,14 +58,14 @@ function App() {
     if (input && isConnected) {
       const message = {
         type: 'msg_recvd',
-        from: id, // Use dynamic user identification
+        from: id,
         origin: 'human',
         message: input,
-        timestamp: new Date().toISOString() // Add timestamp
+        timestamp: new Date().toISOString()
       };
       console.log('Sending:', message);
       client.send(JSON.stringify(message));
-      setMessages((prevMessages) => [...prevMessages, message]); // Add the message to the state
+      setMessages((prevMessages) => [...prevMessages, message]);
       setInput('');
     }
   };
@@ -91,7 +94,29 @@ function App() {
         <span className={`sender ${className}`}>
           {sender} <span className="timestamp">@ {timestamp}</span>
         </span>
-        <span className="text">{messageText}</span>
+        <ReactMarkdown
+          className="text"
+          children={messageText}
+          components={{
+            code({ node, inline, className, children, ...props }) {
+              const match = /language-(\w+)/.exec(className || '');
+              return !inline && match ? (
+                <SyntaxHighlighter
+                  style={materialDark}
+                  language={match[1]}
+                  PreTag="div"
+                  {...props}
+                >
+                  {String(children).replace(/\n$/, '')}
+                </SyntaxHighlighter>
+              ) : (
+                <code className={className} {...props}>
+                  {children}
+                </code>
+              );
+            }
+          }}
+        />
       </div>
     );
   };
