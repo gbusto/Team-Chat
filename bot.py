@@ -16,7 +16,7 @@ logging.getLogger().addHandler(console_handler)
 
 genai.configure(api_key=os.environ['GOOGLE_DEV_API_KEY'])
 
-MOD_TEMP = 0.1
+MOD_TEMP = 0.2
 MOD_TOP_P = 1.0
 
 MODEL = "gemini-1.5-flash-latest"
@@ -46,6 +46,7 @@ class ConversationHistory:
 class AI_Teammate:
     def __init__(self, name, model_name, system_instructions, conversation_history, temperature, top_p):
         logging.info(f"[+] Bot got system instruction: {system_instructions[:20]}")
+        logging.info(f"[+] Bot is being initialized with temperature {temperature} and top_p {top_p}")
         config = generation_types.GenerationConfig(temperature=temperature, top_p=top_p)
 
         self.name = name
@@ -67,6 +68,7 @@ class AI_Teammate:
 class AIModerator:
     def __init__(self, model_name, system_instructions, teammate_name, temperature, top_p):
         logging.info(f"[+] Mod got system instruction: {system_instructions[:20]}")
+        logging.info(f"[+] Mod is being initialized with temperature {temperature} and top_p {top_p}")
         config = generation_types.GenerationConfig(temperature=temperature, top_p=top_p)
         self.model = genai.GenerativeModel(model_name, generation_config=config, system_instruction=system_instructions)
         self.teammate_name = teammate_name

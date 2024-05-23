@@ -5,5 +5,7 @@
     "port": 9801,
     "hub_uri": "ws://localhost:9999",
     "instruction_file": "instructions/alex_instructions.txt",
-    "moderator_instruction_file": "instructions/moderator_instructions.txt"
+    "moderator_instruction_file": "instructions/moderator_instructions.txt",
+    "temperature": "0.9",
+    "top_p": "1.0"
 }

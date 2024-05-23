@@ -21,7 +21,9 @@ def start_bot(config):
         "--port", str(config["port"]),
         "--hub_uri", config["hub_uri"],
         "--instruction-file", config["instruction_file"],
-        "--moderator-instruction-file", config["moderator_instruction_file"]
+        "--moderator-instruction-file", config["moderator_instruction_file"],
+        "--temperature", config["temperature"],
+        "--top-p", config["top_p"],
     ]
     return subprocess.Popen(cmd)
 

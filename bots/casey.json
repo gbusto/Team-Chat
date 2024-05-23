@@ -5,5 +5,7 @@
     "port": 9803,
     "hub_uri": "ws://localhost:9999",
     "instruction_file": "instructions/casey_instructions.txt",
-    "moderator_instruction_file": "instructions/moderator_instructions.txt"
+    "moderator_instruction_file": "instructions/moderator_instructions.txt",
+    "temperature": "0.7",
+    "top_p": "0.9"
 }
