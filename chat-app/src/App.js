@@ -60,6 +60,7 @@ function App() {
       };
       console.log('Sending:', message);
       client.send(JSON.stringify(message));
+      setMessages((prevMessages) => [...prevMessages, message]); // Add the message to the state
       setInput('');
     }
   };
