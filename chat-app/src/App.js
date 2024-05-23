@@ -58,6 +58,7 @@ function App() {
         from: id, // Use dynamic user identification
         origin: 'human',
         message: input,
+        timestamp: new Date().toISOString() // Add timestamp
       };
       console.log('Sending:', message);
       client.send(JSON.stringify(message));
@@ -76,10 +77,20 @@ function App() {
     const className = msg.origin;
     const sender = msg.from.startsWith("[") ? msg.from.match(/\[(.*?)\]/)[1] : msg.from;
     const messageText = msg.from.startsWith("[") ? msg.message.replace(`[${sender}] `, "") : msg.message;
+    const timestamp = new Date(msg.timestamp).toLocaleString('en-US', {
+      month: 'short',
+      day: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
 
     return (
       <div key={index} className="message">
-        <span className={`sender ${className}`}>{sender}</span>
+        <span className={`sender ${className}`}>
+          {sender} <span className="timestamp">@ {timestamp}</span>
+        </span>
         <span className="text">{messageText}</span>
       </div>
     );

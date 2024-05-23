@@ -38,7 +38,7 @@ body {
 .chat-container {
   display: flex;
   flex-direction: column;
-  width: 60%;
+  width: 75%;  /* Increased from 60% */
   height: 100%;
   background-color: #23272a;
   border-radius: 8px;
@@ -52,7 +52,7 @@ body {
 }
 
 .message {
-  margin: 10px 0;
+  margin: 15px 0;  /* Increased gap between messages */
 }
 
 .sender {
@@ -72,8 +72,16 @@ body {
   color: crimson;
 }
 
+.timestamp {
+  font-weight: normal;
+  font-size: 0.9em;
+  margin-left: 10px;
+  color: #888888;
+}
+
 .text {
   margin-left: 10px;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;  /* Better font */
 }
 
 .input-container {
