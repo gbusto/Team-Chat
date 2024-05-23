@@ -62,7 +62,7 @@ async def register_teammate(message, websocket):
         "from": "hub",
         "message": f"[EVENT] {name} has joined the chat."
     }
-    await forward_message("hub", json.dumps(event_message))
+    await forward_message(websocket, json.dumps(event_message))  # Pass websocket to forward_message
 
 async def unregister_teammate(_id):
     if _id in TEAMMATES:
@@ -76,16 +76,16 @@ async def unregister_teammate(_id):
             "from": "hub",
             "message": f"[EVENT] {name} has left the chat."
         }
-        await forward_message("hub", json.dumps(event_message))
+        await forward_message(None, json.dumps(event_message)) # No specific websocket needed for broadcast
 
-async def forward_message(sender_id, message):
-    for _id, teammate in TEAMMATES.items():
-        if _id != sender_id:
+async def forward_message(websocket, message):
+    for teammate in TEAMMATES.values():
+        if teammate.websocket != websocket:  # Compare websockets instead of IDs
             try:
                 await teammate.websocket.send(message)
-                logging.debug(f"Forwarded message from {sender_id} to {teammate.name}")
+                logging.debug(f"Forwarded message to {teammate.name}")
             except Exception as e:
-                logging.error(f"Error forwarding message from {sender_id} to {teammate.name}: {e}")
+                logging.error(f"Error forwarding message to {teammate.name}: {e}")
 
 async def echo(websocket, path):
     try:
@@ -105,7 +105,10 @@ async def echo(websocket, path):
                 msg = message.get("message")
                 sender_name = TEAMMATES[sender_id].name if sender_id in TEAMMATES else "Unknown"
                 print(f"{YELLOW}{sender_name}{RESET} > {msg}")
-                await forward_message(sender_id, message_obj_str)
+                await forward_message(websocket, message_obj_str)  # Pass websocket to forward_message
+            
+            elif msg_type == "ping":
+                await websocket.send(json.dumps({"type": "pong"}))
             
             elif msg_type == "cmd_recvd":
                 # Handle commands if necessary
