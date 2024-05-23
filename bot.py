@@ -21,7 +21,7 @@ MOD_TOP_P = 1.0
 
 MODEL = "gemini-1.5-flash-latest"
 DELAY = 5
-PROCESSING_INTERVAL = 30  # Time in seconds between processing messages
+PROCESSING_INTERVAL = 45  # Time in seconds between processing messages
 MAX_RETRIES = 5  # Maximum number of retries for WebSocket connection
 KEEPALIVE_INTERVAL = 120  # Increase keepalive interval
 
