@@ -53,7 +53,7 @@ class CLIClient:
                     "type": "cli_connect",
                     "name": self.name,
                     "id": self._id,
-                    "being": "human",
+                    "origin": "human",
                     "host": self.host,
                     "port": self.port
                 }
@@ -96,6 +96,7 @@ class CLIClient:
                 message_obj = {
                     "type": "msg_recvd",
                     "from": self._id,
+                    "origin": "human",
                     "message": msg
                 }
                 await self.websocket.send(json.dumps(message_obj))

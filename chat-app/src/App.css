@@ -56,8 +56,24 @@ body {
 }
 
 .sender {
+  display: block;
   font-weight: bold;
-  margin-right: 5px;
+}
+
+.sender.ai {
+  color: orchid;
+}
+
+.sender.human {
+  color: mediumturquoise;
+}
+
+.sender.system {
+  color: crimson;
+}
+
+.text {
+  margin-left: 10px;
 }
 
 .input-container {

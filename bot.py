@@ -107,7 +107,7 @@ class Bot:
                         "type": "ai_connect",
                         "name": self.name,
                         "id": self._id,
-                        "being": "ai",
+                        "origin": "ai",
                         "host": self.host,
                         "port": self.port
                     }
@@ -162,6 +162,7 @@ class Bot:
                     response_msg = {
                         "type": "msg_recvd",
                         "from": self._id,
+                        "origin": "ai",
                         "message": response
                     }
                     await websocket.send(json.dumps(response_msg))

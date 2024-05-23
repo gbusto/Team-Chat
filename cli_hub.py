@@ -20,46 +20,49 @@ def configure_logging(console_output):
 YELLOW = "\033[93m"
 RESET = "\033[0m"
 
+SYSTEM_ID = "system"
+
 # Types documentation ...
 
 class Teammate:
-    def __init__(self, _id, name, being, host, port, websocket):
+    def __init__(self, _id, name, origin, host, port, websocket):
         self._id = _id
         self.name = name
-        self.being = being
+        self.origin = origin
         self.host = host
         self.port = port
         self.websocket = websocket
 
     def is_human(self):
-        return self.being == "human"
+        return self.origin == "human"
     
     def is_ai(self):
-        return self.being == "ai"
+        return self.origin == "ai"
 
 TEAMMATES = {}
 
 async def register_teammate(message, websocket):
     name = message.get("name")
     _id = message.get("id")
-    being = message.get("being")
+    origin = message.get("origin")
     host = message.get("host")
     port = message.get("port")
     tm = Teammate(
         _id=_id,
         name=name,
-        being=being,
+        origin=origin,
         host=host,
         port=port,
         websocket=websocket
     )
     TEAMMATES[_id] = tm
-    logging.info(f"Registered {_id}: {name} ({being})")
+    logging.info(f"Registered {_id}: {name} ({origin})")
 
     # Notify everyone that a new teammate has joined
     event_message = {
         "type": "msg_recvd",
-        "from": "hub",
+        "from": SYSTEM_ID,
+        "origin": SYSTEM_ID,
         "message": f"[EVENT] {name} has joined the chat."
     }
     await forward_message(websocket, json.dumps(event_message))  # Pass websocket to forward_message
@@ -73,7 +76,8 @@ async def unregister_teammate(_id):
         # Notify everyone that a teammate has left
         event_message = {
             "type": "msg_recvd",
-            "from": "hub",
+            "from": SYSTEM_ID,
+            "origin": SYSTEM_ID,
             "message": f"[EVENT] {name} has left the chat."
         }
         await forward_message(None, json.dumps(event_message)) # No specific websocket needed for broadcast
@@ -104,8 +108,9 @@ async def echo(websocket, path):
             elif msg_type == "msg_recvd":
                 sender_id = message.get("from")
                 msg = message.get("message")
+                origin = message.get("origin")
                 sender_name = TEAMMATES[sender_id].name if sender_id in TEAMMATES else "Unknown"
-                print(f"{YELLOW}{sender_name}{RESET} > {msg}")
+                print(f"{YELLOW}{sender_name}|[{origin}]{RESET} > {msg}")
                 await forward_message(websocket, message_obj_str)  # Pass websocket to forward_message
             
             elif msg_type == "ping":

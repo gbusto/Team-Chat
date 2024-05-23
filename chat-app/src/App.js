@@ -56,6 +56,7 @@ function App() {
       const message = {
         type: 'msg_recvd',
         from: id, // Use dynamic user identification
+        origin: 'human',
         message: input,
       };
       console.log('Sending:', message);
@@ -70,6 +71,19 @@ function App() {
   };
 
   useEffect(scrollToBottom, [messages]);
+
+  const renderMessage = (msg, index) => {
+    const className = msg.origin;
+    const sender = msg.from.startsWith("[") ? msg.from.match(/\[(.*?)\]/)[1] : msg.from;
+    const messageText = msg.from.startsWith("[") ? msg.message.replace(`[${sender}] `, "") : msg.message;
+
+    return (
+      <div key={index} className="message">
+        <span className={`sender ${className}`}>{sender}</span>
+        <span className="text">{messageText}</span>
+      </div>
+    );
+  };
 
   return (
     <div className="App">
@@ -94,12 +108,7 @@ function App() {
       ) : (
         <div className="chat-container">
           <div className="messages">
-            {messages.map((msg, index) => (
-              <div key={index} className="message">
-                <span className="sender">{msg.from}</span>
-                <span className="text">{msg.message}</span>
-              </div>
-            ))}
+            {messages.map(renderMessage)}
             <div ref={messageEndRef} />
           </div>
           <div className="input-container">
