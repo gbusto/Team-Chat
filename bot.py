@@ -39,11 +39,11 @@ class ConversationHistory:
             "parts": [{"text": f"[{name}] {text}"}]
         })
 
-    def get_history(self):
-        return [{"role": entry["role"], "parts": entry["parts"]} for entry in self.history]
-
-    def get_recent_history(self, limit=10):
-        return self.history[-limit:]
+    def get_history_gemini(self, limit=-1):
+        if limit < 0:
+            return [{"role": entry["role"], "parts": entry["parts"]} for entry in self.history]
+        
+        return [{"role": entry["role"], "parts": entry["parts"]} for entry in self.history[:limit]]
     
 class GeminiTeammate:
     def __init__(self, name, model_name, system_instructions, conversation_history, extra_params):
@@ -277,14 +277,10 @@ class Bot:
             await asyncio.sleep(PROCESSING_INTERVAL)
 
             # Get the current chat history at this moment
-            # TODO: Change conversation_history.get_history() to be Gemini-specific;
-            # ... then I can add one for OpenAI/GPT, and we can have a specific
-            # history format that matches each of the APIs. Or, have each API modify
-            # history to its ideal state
-            current_chat_history = self.conversation_history.get_history()
+            current_chat_history = self.conversation_history.get_history_gemini()
 
             # Take the last 10 messages for the moderator
-            recent_history = self.conversation_history.get_recent_history()
+            recent_history = current_chat_history[:10]
 
             try:
                 # Ask the teammate moderator if this teammate should speak next...
