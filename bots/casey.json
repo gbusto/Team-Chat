@@ -13,5 +13,6 @@
     "mod_extra_params": {
         "temperature": "0.2",
         "top_p": "1.0"
-    }
+    },
+    "llm": "gemini"
 }

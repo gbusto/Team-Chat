@@ -2,7 +2,7 @@
     "id": "jordan",
     "name": "Jordan",
     "host": "localhost",
-    "port": 9802,
+    "port": 9806,
     "hub_uri": "ws://localhost:9999",
     "instruction_file": "instructions/jordan_instructions.txt",
     "moderator_instruction_file": "instructions/moderator_instructions.txt",
@@ -13,5 +13,6 @@
     "mod_extra_params": {
         "temperature": "0.2",
         "top_p": "1.0"
-    }
+    },
+    "llm": "gemini"
 }

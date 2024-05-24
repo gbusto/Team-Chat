@@ -27,6 +27,7 @@ def start_bot(config):
         "--moderator-instruction-file", config["moderator_instruction_file"],
         "--teammate-extra-params", json.dumps(config["teammate_extra_params"]),
         "--mod-extra-params", json.dumps(config["mod_extra_params"]),
+        "--llm", config["llm"]
     ]
     return subprocess.Popen(cmd)
 

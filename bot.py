@@ -172,7 +172,7 @@ class GeminiModerator:
 class OpenAIAPIHandler:
     def __init__(self, assistant_id):
         self.client = OpenAI()
-        self.assistant = self.client.beta.assitants.retrieve(assistant_id)
+        self.assistant = self.client.beta.assistants.retrieve(assistant_id)
 
     async def interact(self, history):
         # TODO: Eventually add truncation strategy
@@ -187,6 +187,7 @@ class OpenAIAPIHandler:
         thread_id = run.thread_id
 
         while run.status not in ["cancelled", "failed", "completed", "expired"]:
+            logging.info(f"OpenAI API Run is not done yet ({run.status})...")
             await asyncio.sleep(1)
             run = self.client.beta.threads.runs.retrieve(
                 thread_id=thread_id,
@@ -202,18 +203,18 @@ class OpenAIAPIHandler:
             if messages.data:
                 constructed_msg = ""
                 for msg in messages.data:
-                    text = msg.get("content")[0].text.value             
+                    text = msg.content[0].text.value             
                     constructed_msg += text
 
-                logging.info(f"[{self.llm_type()}] {self.name} - response:\n{constructed_msg}")
+                logging.info(f"[gpt] Assistant Run - response:\n{constructed_msg}")
 
                 return constructed_msg
             
             else:
-                logging.warn(f"[{self.llm_type()}] {self.name}'s run doesn't appear to have generated messages")
+                logging.warn(f"[gpt] Assistant Run doesn't appear to have generated messages")
 
         else:
-            logging.warn(f"[{self.llm_type()}] {self.name}'s run ended with status {run.status}")
+            logging.warn(f"[gpt] Assistant Run ended with status {run.status}")
             
         return None
     
@@ -222,7 +223,7 @@ class OpenAITeammate:
         """
         model_name, system_instructions, conversation_history will all likely be None/empty for OpenAI teammates since we're loading assistants already created in OpenAI interface
         """
-        asst_id = extra_params.get("asst_id")
+        asst_id = extra_params.get("assistant_id")
 
         self.name = name
 
@@ -267,23 +268,21 @@ class OpenAITeammate:
         return "gpt"
     
 class OpenAIModerator:
-    def __init__(self, name, model_name, system_instructions, conversation_history, extra_params):
+    def __init__(self, model_name, system_instructions, teammate_name, extra_params):
         """
         model_name, system_instructions, conversation_history will all likely be None/empty for OpenAI teammates since we're loading assistants already created in OpenAI interface
         """
-        asst_id = extra_params.get("asst_id")
-
-        self.name = name
+        asst_id = extra_params.get("assistant_id")
 
         self.handler = OpenAIAPIHandler(assistant_id=asst_id)
         assistant = self.handler.assistant
+
+        self.teammate_name = teammate_name
 
         model_name = assistant.model
         system_instructions = assistant.instructions
         temperature = assistant.temperature
         top_p = assistant.top_p
-
-        self.conversation_history = conversation_history
 
         logging.info(f"[+] OpenAI [{model_name}] got system instruction: {system_instructions[:20]}")
         logging.info(f"[+] Mod is being initialized with temperature {temperature} and top_p {top_p}")
@@ -299,7 +298,7 @@ class OpenAIModerator:
             "content": prompt,
         })
 
-        response = self.handler.interact(recent_history)
+        response = await self.handler.interact(recent_history)
 
         if response.lower() in ["yes", "y"]:
             return True
@@ -345,17 +344,27 @@ class AIModerator:
         return await self.llm.should_speak_next(chat_history)
 
 class Bot:
-    def __init__(self, _id, name, host, port, hub_uri, bot_instructions, mod_instructions, teammate_extra_params, mod_extra_params):
+    def __init__(self, _id, name, host, port, hub_uri, bot_instructions, mod_instructions, teammate_extra_params, mod_extra_params, llm):
         self._id = _id
         self.name = name
         self.host = host
         self.port = port
         self.hub_uri = hub_uri
 
+        if llm == 'gemini':
+            llm_type_teammate = GeminiTeammate
+            llm_type_moderator = GeminiModerator
+        elif llm == 'gpt':
+            llm_type_teammate = OpenAITeammate
+            llm_type_moderator = OpenAIModerator
+        else:
+            raise Exception("No LLM provided!")
+
         self.conversation_history = ConversationHistory()
         self.teammate = AI_Teammate(name=name, model_name=MODEL, system_instructions=bot_instructions,
-                                    conversation_history=self.conversation_history, extra_params=teammate_extra_params)
-        self.moderator = AIModerator(model_name=MODEL, system_instructions=mod_instructions, teammate_name=name, extra_params=mod_extra_params)
+                                    conversation_history=self.conversation_history, extra_params=teammate_extra_params,
+                                    llm=llm_type_teammate)
+        self.moderator = AIModerator(model_name=MODEL, system_instructions=mod_instructions, teammate_name=name, extra_params=mod_extra_params, llm=llm_type_moderator)
         self.message_queue = asyncio.Queue()
 
     async def connect(self):
@@ -445,6 +454,7 @@ def main():
     parser.add_argument("--moderator-instruction-file", type=str, required=True, help="The moderator instruction file")
     parser.add_argument("--mod-extra-params", type=str, required=True, help="A stringified JSON object containing extra params for a moderator")
     parser.add_argument("--teammate-extra-params", type=str, required=True, help="A stringified JSON object containing extra params for a teammate")
+    parser.add_argument("--llm", type=str, required=True, help="The LLM type. Right now, options are 'gemini' or 'gpt'")
 
     args = parser.parse_args()
 
@@ -468,7 +478,8 @@ def main():
 
     bot = Bot(_id=args.id, name=args.name, host=args.host, port=args.port, hub_uri=args.hub_uri,
               bot_instructions=inst, mod_instructions=m_inst,
-              teammate_extra_params=tep, mod_extra_params=mep)
+              teammate_extra_params=tep, mod_extra_params=mep,
+              llm=args.llm)
 
     try:
         asyncio.run(bot.connect())

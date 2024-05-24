@@ -1,0 +1,16 @@
+{
+    "id": "jasper",
+    "name": "Jasper",
+    "host": "localhost",
+    "port": 9805,
+    "hub_uri": "ws://localhost:9999",
+    "instruction_file": "instructions/jasper_instructions.txt",
+    "moderator_instruction_file": "instructions/moderator_instructions.txt",
+    "teammate_extra_params": {
+        "assistant_id": "asst_b7PCbC3r7FSYjEqvKmkwbWdw"
+    },
+    "mod_extra_params": {
+        "assistant_id": "asst_d4KJ9gbE92otE9RwZ51tx02K"
+    },
+    "llm": "gpt"
+}

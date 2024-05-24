@@ -2,7 +2,7 @@
     "id": "alex",
     "name": "Alex",
     "host": "localhost",
-    "port": 9801,
+    "port": 9802,
     "hub_uri": "ws://localhost:9999",
     "instruction_file": "instructions/alex_instructions.txt",
     "moderator_instruction_file": "instructions/moderator_instructions.txt",
@@ -13,5 +13,6 @@
     "mod_extra_params": {
         "temperature": "0.2",
         "top_p": "1.0"
-    }
+    },
+    "llm": "gemini"
 }
