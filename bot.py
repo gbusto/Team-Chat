@@ -45,6 +45,12 @@ class ConversationHistory:
         
         return [{"role": entry["role"], "parts": entry["parts"]} for entry in self.history[:limit]]
     
+    def get_history_openai(self, limit=-1):
+        if limit < 0:
+            return [{"role": entry["role"], "content": entry["text"]} for entry in self.history]
+        
+        return [{"role": entry["role"], "content": entry["text"]} for entry in self.history[:limit]]
+    
 class GeminiTeammate:
     def __init__(self, name, model_name, system_instructions, conversation_history, extra_params):
         temperature = float(extra_params.get("temperature"))
@@ -102,7 +108,10 @@ class GeminiTeammate:
         response = chat.send_message(message)
         reply = response.text
 
-        logging.info(f"{self.name} response: {reply}")
+        # If they have a response to send in the chat, add it to the conversation history
+        self.conversation_history.add_message("ai", self.name, reply)
+
+        logging.info(f"[{self.llm_type()}] {self.name} response: {reply}")
 
         return reply
     
@@ -160,41 +169,148 @@ class GeminiModerator:
     def llm_type(self):
         return "gemini"
     
-# class OpenAITeammate:
-#     def __init__(self, name, model_name, system_instructions, conversation_history, extra_params):
-#         """
-#         model_name, system_instructions, conversation_history will all likely be None/empty for OpenAI teammates since we're loading assistants already created in OpenAI interface
-#         """
-#         asst_id = extra_params.get("asst_id")
+class OpenAIAPIHandler:
+    def __init__(self, assistant_id):
+        self.client = OpenAI()
+        self.assistant = self.client.beta.assitants.retrieve(assistant_id)
 
-#         self.name = name
+    async def interact(self, history):
+        # TODO: Eventually add truncation strategy
+        run = self.client.beta.threads.create_and_run(
+            assistant_id=self.assistant.id,
+            thread={
+                "messages": history
+            }
+        )
 
-#         self.client = OpenAI()
-#         self.assistant = self.client.beta.assistants.retrieve(asst_id)
+        run_id = run.id
+        thread_id = run.thread_id
 
-#         model_name = self.assistant.model
-#         system_instructions = self.assistant.instructions
-#         temperature = self.assistant.temperature
-#         top_p = self.assistant.top_p
+        while run.status not in ["cancelled", "failed", "completed", "expired"]:
+            await asyncio.sleep(1)
+            run = self.client.beta.threads.runs.retrieve(
+                thread_id=thread_id,
+                run_id=run_id
+            )
 
-#         self.conversation_history = conversation_history
+        if run.status == "completed":
+            messages = self.client.beta.threads.messages.list(
+                thread_id=thread_id,
+                run_id=run_id
+            )
 
-#         logging.info(f"[+] OpenAI [{model_name}] got system instruction: {system_instructions[:20]}")
-#         logging.info(f"[+] Bot is being initialized with temperature {temperature} and top_p {top_p}")
-        
-#     async def send_message(self, message, history):
-#         await asyncio.sleep(DELAY)
-#         logging.info(f"{self.name} is processing the message: {message}")
+            if messages.data:
+                constructed_msg = ""
+                for msg in messages.data:
+                    text = msg.get("content")[0].text.value             
+                    constructed_msg += text
 
-#         self.conversation_history.add_message("user", self.name, message)
-#         response = self.chat.send_message(message)
-#         reply = response.text
-#         self.conversation_history.add_message("model", self.name, reply)
-#         logging.info(f"{self.name} response: {reply}")
-#         return reply
+                logging.info(f"[{self.llm_type()}] {self.name} - response:\n{constructed_msg}")
+
+                return constructed_msg
+            
+            else:
+                logging.warn(f"[{self.llm_type()}] {self.name}'s run doesn't appear to have generated messages")
+
+        else:
+            logging.warn(f"[{self.llm_type()}] {self.name}'s run ended with status {run.status}")
+            
+        return None
     
-#     def llm_type(self):
-#         return "gpt"
+class OpenAITeammate:
+    def __init__(self, name, model_name, system_instructions, conversation_history, extra_params):
+        """
+        model_name, system_instructions, conversation_history will all likely be None/empty for OpenAI teammates since we're loading assistants already created in OpenAI interface
+        """
+        asst_id = extra_params.get("asst_id")
+
+        self.name = name
+
+        self.handler = OpenAIAPIHandler(assistant_id=asst_id)
+        assistant = self.handler.assistant
+
+        model_name = assistant.model
+        system_instructions = assistant.instructions
+        temperature = assistant.temperature
+        top_p = assistant.top_p
+
+        self.conversation_history = conversation_history
+
+        logging.info(f"[+] OpenAI [{model_name}] got system instruction: {system_instructions[:20]}")
+        logging.info(f"[+] Bot is being initialized with temperature {temperature} and top_p {top_p}")
+
+    async def allow_send_message(self, moderator):
+        # `moderator` should ALWAYS be a OpenAIModerator type
+
+        # Get the current chat history at this moment
+        current_chat_history = self.conversation_history.get_history_openai()
+
+        # Take the last 10 messages for the moderator
+        recent_history = current_chat_history[:10]
+
+        should_speak = await moderator.should_speak_next(recent_history)
+        if should_speak:
+            response = await self.send_message(history=current_chat_history)
+
+            return response
+        
+        return None
+        
+    async def send_message(self, history):
+        await asyncio.sleep(DELAY)
+        logging.info(f"[{self.llm_type()}] {self.name} is processing chat history")
+
+        response = await self.handler.interact(history)
+        return response
+    
+    def llm_type(self):
+        return "gpt"
+    
+class OpenAIModerator:
+    def __init__(self, name, model_name, system_instructions, conversation_history, extra_params):
+        """
+        model_name, system_instructions, conversation_history will all likely be None/empty for OpenAI teammates since we're loading assistants already created in OpenAI interface
+        """
+        asst_id = extra_params.get("asst_id")
+
+        self.name = name
+
+        self.handler = OpenAIAPIHandler(assistant_id=asst_id)
+        assistant = self.handler.assistant
+
+        model_name = assistant.model
+        system_instructions = assistant.instructions
+        temperature = assistant.temperature
+        top_p = assistant.top_p
+
+        self.conversation_history = conversation_history
+
+        logging.info(f"[+] OpenAI [{model_name}] got system instruction: {system_instructions[:20]}")
+        logging.info(f"[+] Mod is being initialized with temperature {temperature} and top_p {top_p}")
+
+    async def should_speak_next(self, chat_history):
+        await asyncio.sleep(DELAY)
+
+        recent_history = chat_history[-10:] # Get the last 10 messages
+        prompt = f"Based on the following conversation history, should {self.teammate_name} speak next? Respond with a single word: either YES or NO."
+
+        recent_history.append({
+            "role": "user",
+            "content": prompt,
+        })
+
+        response = self.handler.interact(recent_history)
+
+        if response.lower() in ["yes", "y"]:
+            return True
+        
+        if response.lower() in ["no", "n"]:
+            logging.warn(f"[{self.llm_type()}] Moderator for {self.teammate_name} doesn't seemd to have generated a proper response: {response}")
+
+        return False
+    
+    def llm_type(self):
+        return "gpt"
 
 class AI_Teammate:
     def __init__(self, name, model_name, system_instructions, conversation_history, extra_params, llm=GeminiTeammate):
@@ -304,8 +420,6 @@ class Bot:
                 response = await self.teammate.allow_send_message(self.moderator)
 
                 if response:
-                    # If they have a response to send in the chat, add it to the conversation history
-                    self.conversation_history.add_message("model", self.name, response)
                     response_msg = {
                         "type": "msg_recvd",
                         "from": self._id,
