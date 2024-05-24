@@ -61,6 +61,31 @@ class GeminiTeammate:
         # it in self.send_message()
         self.conversation_history = conversation_history
 
+    async def allow_send_message(self, moderator):
+        # `moderator` should ALWAYS be a GeminiModerator type
+        
+        # Get the current chat history at this moment
+        current_chat_history = self.conversation_history.get_history_gemini()
+
+        # Take the last 10 messages for the moderator
+        recent_history = current_chat_history[:10]
+
+        # Ask the teammate moderator if this teammate should speak next...
+        # It will return a tuple (bool, str)
+        # The bool determines whether or not the teammate should respond
+        # If yes, the moderator should have generated a summary to give the teammate to help them respond with accuracy
+        should_speak, summary = await moderator.should_speak_next(recent_history)
+        if should_speak:
+            # If the bot should speak next, send it the entire chat history
+            # The 'summary' is the message we send it. This is how it works for Gemini, but when we
+            # create the ChatGPT teammate, I don't think this will be necessary; it will just need the
+            # chat history
+            response = await self.send_message(message=summary, history=current_chat_history)
+
+            return response
+        
+        return None
+
     async def send_message(self, message, history):
         await asyncio.sleep(DELAY)
         logging.info(f"{self.name} is processing the most current chat history to respond")
@@ -76,9 +101,6 @@ class GeminiTeammate:
         # accurately capture the context in which this teammate should respond.
         response = chat.send_message(message)
         reply = response.text
-
-        # Update the "official" chat history managed by the Bot class
-        self.conversation_history.add_message("model", self.name, reply)
 
         logging.info(f"{self.name} response: {reply}")
 
@@ -150,20 +172,19 @@ class GeminiModerator:
 #         self.client = OpenAI()
 #         self.assistant = self.client.beta.assistants.retrieve(asst_id)
 
+#         model_name = self.assistant.model
 #         system_instructions = self.assistant.instructions
 #         temperature = self.assistant.temperature
 #         top_p = self.assistant.top_p
 
 #         self.conversation_history = conversation_history
 
-#         logging.info(f"[+] Bot got system instruction: {system_instructions[:20]}")
+#         logging.info(f"[+] OpenAI [{model_name}] got system instruction: {system_instructions[:20]}")
 #         logging.info(f"[+] Bot is being initialized with temperature {temperature} and top_p {top_p}")
         
-#     async def send_message(self, message):
+#     async def send_message(self, message, history):
 #         await asyncio.sleep(DELAY)
 #         logging.info(f"{self.name} is processing the message: {message}")
-
-
 
 #         self.conversation_history.add_message("user", self.name, message)
 #         response = self.chat.send_message(message)
@@ -174,7 +195,6 @@ class GeminiModerator:
     
 #     def llm_type(self):
 #         return "gpt"
-
 
 class AI_Teammate:
     def __init__(self, name, model_name, system_instructions, conversation_history, extra_params, llm=GeminiTeammate):
@@ -187,6 +207,9 @@ class AI_Teammate:
         )
 
         logging.info(f"[+] Created an a teammate with LLM of type {self.llm.llm_type()}")
+
+    async def allow_send_message(self, moderator):
+        return await self.llm.allow_send_message(moderator=moderator)
 
     async def send_message(self, message, history):
         return await self.llm.send_message(message=message, history=history)
@@ -276,24 +299,13 @@ class Bot:
         while True:
             await asyncio.sleep(PROCESSING_INTERVAL)
 
-            # Get the current chat history at this moment
-            current_chat_history = self.conversation_history.get_history_gemini()
-
-            # Take the last 10 messages for the moderator
-            recent_history = current_chat_history[:10]
-
             try:
-                # Ask the teammate moderator if this teammate should speak next...
-                # It will return a tuple (bool, str)
-                # The bool determines whether or not the teammate should respond
-                # If yes, the moderator should have generated a summary to give the teammate to help them respond with accuracy
-                should_speak, summary = await self.moderator.should_speak_next(recent_history)
-                if should_speak:
-                    # If the bot should speak next, send it the entire chat history
-                    # The 'summary' is the message we send it. This is how it works for Gemini, but when we
-                    # create the ChatGPT teammate, I don't think this will be necessary; it will just need the
-                    # chat history
-                    response = await self.teammate.send_message(message=summary, history=current_chat_history)
+                # Give the teammate a chance to see if it should respond
+                response = await self.teammate.allow_send_message(self.moderator)
+
+                if response:
+                    # If they have a response to send in the chat, add it to the conversation history
+                    self.conversation_history.add_message("model", self.name, response)
                     response_msg = {
                         "type": "msg_recvd",
                         "from": self._id,
