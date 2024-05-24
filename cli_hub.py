@@ -47,7 +47,7 @@ def get_timestamp():
     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 def get_chat_filename():
-    return datetime.now().strftime('%b-%d-%Y_%I-%M-%p.chat')
+    return datetime.now().strftime('.chat-history/%b-%d-%Y_%I-%M-%p.chat')
 
 def initialize_chat_history():
     global chat_history_file

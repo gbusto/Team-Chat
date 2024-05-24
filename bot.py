@@ -43,7 +43,7 @@ class ConversationHistory:
     def get_recent_history(self, limit=10):
         return self.history[-limit:]
     
-class GeminiLLM:
+class GeminiTeammate:
     def __init__(self, name, model_name, system_instructions, conversation_history, temperature, top_p):
         logging.info(f"[+] Bot got system instruction: {system_instructions[:20]}")
         logging.info(f"[+] Bot is being initialized with temperature {temperature} and top_p {top_p}")
@@ -67,24 +67,8 @@ class GeminiLLM:
     
     def llm_type(self):
         return "Gemini"
-
-class AI_Teammate:
-    def __init__(self, name, model_name, system_instructions, conversation_history, temperature, top_p, llm=GeminiLLM):
-        self.llm = llm(
-            name=name,
-            model_name=model_name,
-            system_instructions=system_instructions,
-            conversation_history=conversation_history,
-            temperature=temperature,
-            top_p=top_p
-        )
-
-        logging.info(f"[+] Created an LLM of type {self.llm.llm_type()}")
-
-    async def send_message(self, message):
-        return await self.llm.send_message(message)
-
-class AIModerator:
+    
+class GeminiModerator:
     def __init__(self, model_name, system_instructions, teammate_name, temperature, top_p):
         logging.info(f"[+] Mod got system instruction: {system_instructions[:20]}")
         logging.info(f"[+] Mod is being initialized with temperature {temperature} and top_p {top_p}")
@@ -110,6 +94,40 @@ class AIModerator:
         else:
             logging.error(f"Invalid response from moderator: {answer}")
             return False  # Default to not speaking if the response is invalid
+        
+    def llm_type(self):
+        return "Gemini"
+
+class AI_Teammate:
+    def __init__(self, name, model_name, system_instructions, conversation_history, temperature, top_p, llm=GeminiTeammate):
+        self.llm = llm(
+            name=name,
+            model_name=model_name,
+            system_instructions=system_instructions,
+            conversation_history=conversation_history,
+            temperature=temperature,
+            top_p=top_p
+        )
+
+        logging.info(f"[+] Created an a teammate with LLM of type {self.llm.llm_type()}")
+
+    async def send_message(self, message):
+        return await self.llm.send_message(message)
+
+class AIModerator:
+    def __init__(self, model_name, system_instructions, teammate_name, temperature, top_p, llm=GeminiModerator):
+        self.llm = llm(
+            model_name=model_name,
+            system_instructions=system_instructions,
+            teammate_name=teammate_name,
+            temperature=temperature,
+            top_p=top_p
+        )
+
+        logging.info(f"[+] Created a moderator for teammate {teammate_name} with LLM of type {self.llm.llm_type()}")
+
+    async def should_speak_next(self, chat_history):
+        return await self.llm.should_speak_next(chat_history)
 
 class Bot:
     def __init__(self, _id, name, host, port, hub_uri, bot_instructions, mod_instructions, temperature, top_p):
