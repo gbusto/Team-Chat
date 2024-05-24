@@ -42,8 +42,8 @@ class ConversationHistory:
 
     def get_recent_history(self, limit=10):
         return self.history[-limit:]
-
-class AI_Teammate:
+    
+class GeminiLLM:
     def __init__(self, name, model_name, system_instructions, conversation_history, temperature, top_p):
         logging.info(f"[+] Bot got system instruction: {system_instructions[:20]}")
         logging.info(f"[+] Bot is being initialized with temperature {temperature} and top_p {top_p}")
@@ -64,6 +64,25 @@ class AI_Teammate:
         self.conversation_history.add_message("model", self.name, reply)
         logging.info(f"{self.name} response: {reply}")
         return reply
+    
+    def llm_type(self):
+        return "Gemini"
+
+class AI_Teammate:
+    def __init__(self, name, model_name, system_instructions, conversation_history, temperature, top_p, llm=GeminiLLM):
+        self.llm = llm(
+            name=name,
+            model_name=model_name,
+            system_instructions=system_instructions,
+            conversation_history=conversation_history,
+            temperature=temperature,
+            top_p=top_p
+        )
+
+        logging.info(f"[+] Created an LLM of type {self.llm.llm_type()}")
+
+    async def send_message(self, message):
+        return await self.llm.send_message(message)
 
 class AIModerator:
     def __init__(self, model_name, system_instructions, teammate_name, temperature, top_p):

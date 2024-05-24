@@ -3,13 +3,16 @@ import json
 import subprocess
 import signal
 import time
+import argparse
 
-def load_bot_configs(directory):
+def load_bot_configs(directory, bot_names):
     bot_configs = []
     for filename in os.listdir(directory):
         if filename.endswith(".json"):
             with open(os.path.join(directory, filename), 'r') as file:
-                bot_configs.append(json.load(file))
+                config = json.load(file)
+                if bot_names == "*" or config.get("name") in bot_names:
+                    bot_configs.append(config)
     return bot_configs
 
 def start_bot(config):
@@ -22,13 +25,18 @@ def start_bot(config):
         "--hub_uri", config["hub_uri"],
         "--instruction-file", config["instruction_file"],
         "--moderator-instruction-file", config["moderator_instruction_file"],
-        "--temperature", config["temperature"],
-        "--top-p", config["top_p"],
+        "--temperature", str(config["temperature"]),
+        "--top-p", str(config["top_p"]),
     ]
     return subprocess.Popen(cmd)
 
 def main():
-    bot_configs = load_bot_configs("bots")
+    parser = argparse.ArgumentParser(description="Start AI Bots")
+    parser.add_argument("--bots", type=str, default="*", help="Comma-delimited list of bot names to load (default: all bots)")
+    args = parser.parse_args()
+
+    bot_names = args.bots.split(",") if args.bots != "*" else "*"
+    bot_configs = load_bot_configs("bots", bot_names)
     processes = []
 
     try:
