@@ -6,6 +6,12 @@
     "hub_uri": "ws://localhost:9999",
     "instruction_file": "instructions/jordan_instructions.txt",
     "moderator_instruction_file": "instructions/moderator_instructions.txt",
-    "temperature": "0.6",
-    "top_p": "0.8"
+    "teammate_extra_params": {
+        "temperature": "0.6",
+        "top_p": "0.8"
+    },
+    "mod_extra_params": {
+        "temperature": "0.2",
+        "top_p": "1.0"
+    }
 }

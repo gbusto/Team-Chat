@@ -25,8 +25,8 @@ def start_bot(config):
         "--hub_uri", config["hub_uri"],
         "--instruction-file", config["instruction_file"],
         "--moderator-instruction-file", config["moderator_instruction_file"],
-        "--temperature", str(config["temperature"]),
-        "--top-p", str(config["top_p"]),
+        "--teammate-extra-params", json.dumps(config["teammate_extra_params"]),
+        "--mod-extra-params", json.dumps(config["mod_extra_params"]),
     ]
     return subprocess.Popen(cmd)
 
