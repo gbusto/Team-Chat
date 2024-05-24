@@ -23,7 +23,7 @@ MOD_TOP_P = 1.0
 
 MODEL = "gemini-1.5-flash-latest"
 DELAY = 5
-PROCESSING_INTERVAL = 45  # Time in seconds between processing messages
+PROCESSING_INTERVAL = 15  # Time in seconds between processing messages
 MAX_RETRIES = 5  # Maximum number of retries for WebSocket connection
 KEEPALIVE_INTERVAL = 120  # Increase keepalive interval
 
@@ -41,15 +41,45 @@ class ConversationHistory:
 
     def get_history_gemini(self, limit=-1):
         if limit < 0:
-            return [{"role": entry["role"], "parts": entry["parts"]} for entry in self.history]
+            history = self.history
+        else:
+            history = self.history[:limit]
+
+        modified_history = []
+        for entry in self.history:
+            role = entry["role"]
+            parts = entry["parts"]
+
+            if role == "ai":
+                role = "model"
+
+            modified_history.append({
+                "role": role,
+                "parts": parts
+            })
         
-        return [{"role": entry["role"], "parts": entry["parts"]} for entry in self.history[:limit]]
+        return modified_history
     
     def get_history_openai(self, limit=-1):
         if limit < 0:
-            return [{"role": entry["role"], "content": entry["text"]} for entry in self.history]
+            history = self.history
+        else:
+            history = self.history[:limit]
+
+        modified_history = []
+        for entry in self.history:
+            role = entry["role"]
+            content = entry["text"]
+
+            if role == "ai":
+                role = "assistant"
+
+            modified_history.append({
+                "role": role,
+                "content": content
+            })
         
-        return [{"role": entry["role"], "content": entry["text"]} for entry in self.history[:limit]]
+        return modified_history
     
 class GeminiTeammate:
     def __init__(self, name, model_name, system_instructions, conversation_history, extra_params):
@@ -262,6 +292,8 @@ class OpenAITeammate:
         logging.info(f"[{self.llm_type()}] {self.name} is processing chat history")
 
         response = await self.handler.interact(history)
+        self.conversation_history.add_message("ai", self.name, response)
+
         return response
     
     def llm_type(self):
