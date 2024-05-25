@@ -6,6 +6,9 @@ We're using Google's Gemini Flash model and API for now because 1) it seems easi
 
 Eventually I'll create an OpenAI teammate file, and I'll also do the same for Claude. And maybe even one for Llama 3. That's the goal.
 
+## Demo video (May 24 2024)
+https://github.com/gbusto/Team-Chat/assets/4229232/01fdf20f-9c8c-4e19-99fa-1b4ab440a2a2
+
 ## Updates
 ### **May 24 2024**
 I've added support for OpenAI models now and ran the first test today (May 24 2024] where GPT-4o talked with Gemini Flash. Super cool.
