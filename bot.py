@@ -22,10 +22,13 @@ MOD_TEMP = 0.2
 MOD_TOP_P = 1.0
 
 MODEL = "gemini-1.5-flash-latest"
-DELAY = 5
+DELAY = 45
+DELAY_OPENAI = 20
 PROCESSING_INTERVAL = 15  # Time in seconds between processing messages
 MAX_RETRIES = 5  # Maximum number of retries for WebSocket connection
 KEEPALIVE_INTERVAL = 120  # Increase keepalive interval
+
+RECENT_HISTORY_NUMBER = 25
 
 class ConversationHistory:
     def __init__(self):
@@ -46,7 +49,7 @@ class ConversationHistory:
             history = self.history[:limit]
 
         modified_history = []
-        for entry in self.history:
+        for entry in history:
             role = entry["role"]
             parts = entry["parts"]
 
@@ -67,7 +70,7 @@ class ConversationHistory:
             history = self.history[:limit]
 
         modified_history = []
-        for entry in self.history:
+        for entry in history:
             role = entry["role"]
             content = entry["text"]
 
@@ -162,7 +165,7 @@ class GeminiModerator:
 
     async def should_speak_next(self, chat_history):
         await asyncio.sleep(DELAY)
-        recent_history = chat_history[-10:]  # Get the last 10 messages
+        recent_history = chat_history[-RECENT_HISTORY_NUMBER:]  # Get the last 10 messages
         history_text = "\n".join([f"{entry['parts'][0]['text']}" for entry in recent_history])
 
         # Give the moderator a solid prompt message; it uses more tokens but should hopefully result in
@@ -320,10 +323,12 @@ class OpenAIModerator:
         logging.info(f"[+] Mod is being initialized with temperature {temperature} and top_p {top_p}")
 
     async def should_speak_next(self, chat_history):
-        await asyncio.sleep(DELAY)
+        await asyncio.sleep(DELAY_OPENAI)
 
-        recent_history = chat_history[-10:] # Get the last 10 messages
-        prompt = f"Based on the following conversation history, should {self.teammate_name} speak next? Respond with a single word: either YES or NO."
+        recent_history = chat_history[-RECENT_HISTORY_NUMBER:] # Get the last 10 messages
+        print("MOD")
+        print(recent_history)
+        prompt = f"Based on the conversation history you have access to, should {self.teammate_name} speak next? Respond with a single word: either YES or NO."
 
         recent_history.append({
             "role": "user",
@@ -335,8 +340,10 @@ class OpenAIModerator:
         if response.lower() in ["yes", "y"]:
             return True
         
-        if response.lower() in ["no", "n"]:
-            logging.warn(f"[{self.llm_type()}] Moderator for {self.teammate_name} doesn't seemd to have generated a proper response: {response}")
+        elif response.lower() in ["no", "n"]:
+            return False
+        
+        logging.warn(f"[{self.llm_type()}] Moderator for {self.teammate_name} doesn't seemd to have generated a proper response: {response}")
 
         return False
     

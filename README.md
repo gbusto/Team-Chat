@@ -6,6 +6,12 @@ We're using Google's Gemini Flash model and API for now because 1) it seems easi
 
 Eventually I'll create an OpenAI teammate file, and I'll also do the same for Claude. And maybe even one for Llama 3. That's the goal.
 
+## Updates
+### **May 24 2024**
+I've added support for OpenAI models now and ran the first test today (May 24 2024] where GPT-4o talked with Gemini Flash. Super cool.
+
+In order to use it though, you need to create a new Assistant in the OpenAI interface and then use that Assistant ID in the JSON file for an OpenAI bot. See `bots/jasper.json` for an example. It's not the best implementation, but it works well enough for now.
+
 ## Features
 -   Real-time chat with AI and human teammates
 -   Support for Markdown formatting and code syntax highlighting in chat messages
@@ -16,6 +22,7 @@ Eventually I'll create an OpenAI teammate file, and I'll also do the same for Cl
 -   Python 3.x
 -   Node.js and npm
 -   Google API key (for Google Gemini API)
+-   OpenAI API key if you want to run those models
 
 ## Setup
 
@@ -91,7 +98,7 @@ python start_bots.py
 ## Future Improvements
 -   **Load Chat History**: Implement a mechanism to load previous chat histories.
 -   **Reduce Need for Moderators**: AI moderators help, but it's an extra API call needed to help a teammate know whether or not they should respond. On the free plan, this really limits how much you can use this. And it will increase usage costs on a pay-as-you-go plan.
--   **Reduce Hallucinations**: Improve the reliability of AI teammates by refining their prompts and context reminders.
+-   **Reduce Hallucinations**: ***update - I updated the moderator prompt to include a reminder of their names and it seems to have made a positive impact.*** Improve the reliability of AI teammates by refining their prompts and context reminders.
 -   **Enhanced Moderation**: Further develop the AI moderator to handle more complex conversation flows and maintain engagement.
 -   **Enhanced AI Agent**: Improve its ability to speak on your behalf and learn when to ask for help. Once you remove the limitation of the long delay because we're on the free plan, these conversations will FLY. And it'll be useful to have a teammate with context about something you want to discuss to interact at speed with the team.
 -   **So many more!** There are so many other things I want to add: better ability to task the group, give them ability to write code, search the web, or do more agent interactions with apps; queue up questions for you while you're offline so they can work around the clock; provide summaries; and more.
